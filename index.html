@@ -902,7 +902,7 @@ body{padding-bottom:0}
               <label for="privacy" style="cursor:pointer">「<!-- TODO: アプリ上でprivacyページを公開した際のURLが privacy.html と異なる場合は、このほか会社概要・フッターを含む計3か所のhrefをそのURLに差し替えてください --><a href="privacy.html" target="_blank" rel="noopener">個人情報の取扱い</a>」に同意のうえ、送信します。<span class="req" style="margin-left:4px">必須</span><br><span class="note" style="display:block;margin-top:4px">※営業電話への同意は、資料請求・導入相談の必須条件ではありません。</span></label>
             </div>
             <button type="submit" class="btn btn-main submit">送信する</button>
-            <p class="note form-note">送信後、担当より折り返しご連絡いたします。</p>
+            <p class="note form-note">送信ボタンを押すと、宛先 oishi@bstech.co.jp のメールソフトが開きます（現在はメール送信方式）。送信後、担当より折り返しご連絡いたします。</p>
           </form>
         </div>
         <div id="complete" role="status" aria-live="polite">
@@ -936,14 +936,15 @@ body{padding-bottom:0}
 /* =========================================================
    計測・送信の設定（公開前に差し替え）
    1) GA4計測ID → GA4_ID を設定
-   2) フォーム送信先 → FORM_ENDPOINT に受信用URL（または通知サービス）を設定
-      未設定のままの場合はデモ送信（完了画面表示のみ）で動作します
+   2) フォーム送信先 → FORM_ENDPOINT に受信用URLを設定
+      未設定の場合は FORM_EMAIL（oishi@bstech.co.jp）宛にメールソフトで送信します
    3) 送信成功時のみ generate_lead イベントを発火（二重計測なし）
    ========================================================= */
 (function(){
   "use strict";
   var GA4_ID = "";           /* 例: "G-XXXXXXXXXX" */
-  var FORM_ENDPOINT = "";    /* 例: "https://form.example.com/submit" */
+  var FORM_ENDPOINT = "";    /* フォーム送信サービスのURL（用意できたら設定。未設定時はFORM_EMAIL宛にメールソフト送信） */
+  var FORM_EMAIL = "oishi@bstech.co.jp"; /* フォーム受信先メールアドレス */
 
   /* GA4 読み込み（ID設定時のみ） */
   if (GA4_ID) {
@@ -1029,15 +1030,36 @@ body{padding-bottom:0}
           alert("送信に失敗しました。お手数ですが、時間をおいて再度お試しください。");
         });
     } else {
-      /* デモ動作：送信先未設定時は完了画面を表示 */
-      showComplete(type);
+      /* FORM_ENDPOINT 未設定：宛先 FORM_EMAIL あてにメールソフトで送信 */
+      var g = function(id){ var el = document.getElementById(id); return el ? el.value.trim() : ""; };
+      var prod = form.querySelector('input[name="product"]:checked');
+      var lines = [
+        "お問い合わせ種別: " + type,
+        "会社名: " + company,
+        "担当者名: " + name,
+        "メールアドレス: " + email,
+        "電話番号: " + (g("tel") || "（未記入）"),
+        "業態: " + (g("biz") || "（未選択）"),
+        "都道府県: " + (g("pref") || "（未選択）"),
+        "希望製品: " + (prod ? prod.value : "未定"),
+        "現在のフライヤー台数: " + (g("count") || "（未選択）"),
+        "相談内容: " + (g("msg") || "（未記入）")
+      ];
+      var subject = "【" + type + "】業務用ウォーターフライヤーに関する問い合わせ";
+      location.href = "mailto:" + FORM_EMAIL + "?subject=" + encodeURIComponent(subject) + "&body=" + encodeURIComponent(lines.join("\n"));
+      showComplete(type, true);
     }
   });
-  function showComplete(type){
+  function showComplete(type, mailMode){
     document.getElementById("form-area").style.display = "none";
-    var msg = type === "導入相談"
-      ? "導入相談を受け付けました。内容を確認のうえ、担当より折り返しご連絡いたします。"
-      : "資料請求を受け付けました。資料は担当より折り返しご連絡いたします。";
+    var msg;
+    if (mailMode) {
+      msg = "入力内容を受け付けました。宛先 oishi@bstech.co.jp あてのメールソフトが開きますので、そのまま送信してください。（メールソフトが開かない場合は、上記アドレスへ直接お送りください。）";
+    } else {
+      msg = type === "導入相談"
+        ? "導入相談を受け付けました。内容を確認のうえ、担当より折り返しご連絡いたします。"
+        : "資料請求を受け付けました。資料は担当より折り返しご連絡いたします。";
+    }
     document.getElementById("complete-msg").textContent = msg;
     document.getElementById("complete").style.display = "block";
     document.getElementById("contact").scrollIntoView({ behavior: reduced ? "auto" : "smooth" });
